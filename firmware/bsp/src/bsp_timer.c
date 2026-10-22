@@ -32,13 +32,21 @@ uint32_t bsp_timer_calibrate(void)
     const uint32_t t0 = TIM2->CNT;
     uint32_t elapsed;
     do {
+        /* SYST_CVR is a live, volatile down-counter: this reads it again on
+         * every loop iteration, so "s0 - SYST_CVR" is two different values,
+         * not a self-subtraction. cppcheck's duplicateExpression check does
+         * not model that a volatile register changes between reads. */
+        // cppcheck-suppress duplicateExpression
         elapsed = (s0 - SYST_CVR) & 0x00FFFFFFu; /* SysTick counts down */
     } while (elapsed < CAL_CYCLES);
     const uint32_t t1 = TIM2->CNT;
     SYST_CSR = 0u;
     TIM2->CR1 = 0u;
 
-    /* f_tim = timer ticks / elapsed core cycles * f_cpu */
+    /* f_tim = timer ticks / elapsed core cycles * f_cpu
+     * Same false positive as above: t0 and t1 are TIM2->CNT sampled ~48ms
+     * apart, not the same value twice. */
+    // cppcheck-suppress duplicateExpression
     const uint64_t hz = ((uint64_t)(t1 - t0) * BSP_CPU_CLOCK_HZ) / elapsed;
     if ((hz > 1000000u) && (hz < 4000000000u)) {
         s_tim_hz = (uint32_t)hz;

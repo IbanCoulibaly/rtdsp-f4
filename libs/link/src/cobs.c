@@ -31,6 +31,14 @@ size_t cobs_encode(const uint8_t *src, size_t len, uint8_t *dst, size_t cap)
                 dst[code_idx] = code;
                 code = 1u;
                 code_idx = w++;
+                /* Not always true: w was already bounds-checked earlier in this
+                 * else-branch for a *different* value (before the dst[w++]
+                 * above), so this code_idx (that earlier w, now +1) can still
+                 * be < cap here. This is a real, necessary bounds check for the
+                 * 254-byte block boundary, exercised by test_cobs_roundtrip's
+                 * "no zeros" mode (long non-zero runs). cppcheck's value-flow
+                 * conflates this with the unrelated branch at line ~20-21. */
+                // cppcheck-suppress knownConditionTrueFalse
                 if (code_idx >= cap) {
                     return 0u;
                 }

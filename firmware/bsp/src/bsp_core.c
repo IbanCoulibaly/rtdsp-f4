@@ -12,7 +12,7 @@
 /* Every hardware wait is bounded: a dead crystal must not hang boot. */
 #define CLOCK_WAIT_LOOPS 500000u
 
-static int wait_set(volatile uint32_t *reg, uint32_t mask, uint32_t value)
+static int wait_set(const volatile uint32_t *reg, uint32_t mask, uint32_t value)
 {
     for (uint32_t i = 0u; i < CLOCK_WAIT_LOOPS; i++) {
         if ((*reg & mask) == value) {
@@ -25,6 +25,10 @@ static int wait_set(volatile uint32_t *reg, uint32_t mask, uint32_t value)
 /* HSE 8 MHz -> PLL: VCO = HSE / M * N = 8 / 8 * 336 = 336 MHz
  *                   SYSCLK = VCO / P = 168 MHz, USB/SDIO = VCO / Q = 48 MHz
  * AHB = 168 MHz, APB1 = 42 MHz (timers x2 = 84 MHz), APB2 = 84 MHz. */
+#define PLL_M 8u
+#define PLL_N 336u
+#define PLL_P 2u /* SYSCLK = VCO / PLL_P = 336 / 2 = 168 MHz */
+#define PLL_Q 7u /* USB/SDIO = VCO / PLL_Q = 336 / 7 = 48 MHz */
 static void clock_init(void)
 {
     RCC->CR |= RCC_CR_HSEON;
@@ -32,10 +36,20 @@ static void clock_init(void)
         return; /* stay on HSI 16 MHz; the supervisor will report a wrong clock */
     }
     RCC->APB1ENR |= RCC_APB1ENR_PWREN;
-    PWR_CR |= (1u << 14);                                  /* VOS: scale 1 for 168 MHz */
-    FLASH_ACR = (1u << 8) | (1u << 9) | (1u << 10) | 5u;   /* prefetch, I/D cache, 5 wait states */
-    RCC->CFGR = (0u << 4) | (5u << 10) | (4u << 13);       /* HPRE /1, PPRE1 /4, PPRE2 /2 */
-    RCC->PLLCFGR = 8u | (336u << 6) | (((2u / 2u) - 1u) << 16) | (1u << 22) | (7u << 24);
+    PWR_CR |= (1u << 14);                                /* VOS: scale 1 for 168 MHz */
+    FLASH_ACR = (1u << 8) | (1u << 9) | (1u << 10) | 5u; /* prefetch, I/D cache, 5 wait states */
+    /* HPRE field is 0 (AHB /1) at reset; written explicitly so all three
+     * prescalers are visible together, matching the comment above. */
+    // cppcheck-suppress badBitmaskCheck
+    RCC->CFGR = (0u << 4) | (5u << 10) | (4u << 13); /* HPRE /1, PPRE1 /4, PPRE2 /2 */
+    /* PLLP's register encoding is (P/2 - 1); for PLL_P == 2 that's 0, written
+     * out via the formula -- not the literal 0 -- so the derivation (and the
+     * resulting PLLP encoding) stays correct if PLL_P is ever changed to 4,
+     * 6 or 8. cppcheck sees PLL_P==2 expand to "2u / 2u" and flags it as a
+     * suspicious self-division; it is not one. */
+    // cppcheck-suppress duplicateExpression
+    // cppcheck-suppress badBitmaskCheck
+    RCC->PLLCFGR = PLL_M | (PLL_N << 6) | (((PLL_P / 2u) - 1u) << 16) | (1u << 22) | (PLL_Q << 24);
     RCC->CR |= RCC_CR_PLLON;
     if (!wait_set(&RCC->CR, RCC_CR_PLLRDY, RCC_CR_PLLRDY)) {
         return;

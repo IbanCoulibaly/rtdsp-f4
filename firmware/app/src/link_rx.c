@@ -120,6 +120,10 @@ static void on_debug_fault(const frame_t *f)
     if (kind == DBG_FAULT_UDF) {
         __asm volatile("udf #0");
     } else if (kind == DBG_FAULT_ASSERT) {
+        /* Deliberately, always false: this is the fault-injection hook that
+         * test_pil_faults.py uses to make the board crash an assert on
+         * command, then checks that it reboots and reports correctly. */
+        // cppcheck-suppress knownConditionTrueFalse
         configASSERT(kind == 0u);
     }
     (void)tx_post_ack(f->type, f->seq, ST_ERR_FILTER_PARAM);
