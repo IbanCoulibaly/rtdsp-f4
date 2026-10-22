@@ -3,40 +3,44 @@
 [![CI](https://github.com/IbanCoulibaly/rtdsp-f4/actions/workflows/ci.yml/badge.svg)](https://github.com/IbanCoulibaly/rtdsp-f4/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## What is this, in plain English?
+## Overview
 
-This project takes a wobbly signal — sound, really, but it could be any
-electrical signal that wiggles up and down — and cleans it up in real time,
-on a microcontroller the size of a fingernail that costs about $10.
+This project processes a signal — audio, or any electrical signal that
+varies over time — in real time on a microcontroller costing roughly $10,
+and verifies that its output is mathematically correct before anything
+ships.
 
-A **filter** is a set of rules about which "speeds of wiggle" (engineers call
-this *frequency*) get let through, and which get blocked. This project builds
-four classic kinds of rules:
+A **filter** controls which frequencies (how quickly a signal oscillates)
+are passed through and which are removed. This project implements four
+standard filter types:
 
-| Filter | What it lets through | Everyday example |
+| Filter | Effect | Typical application |
 |---|---|---|
-| **Low-pass** | slow wiggles only | smoothing out hiss or static |
-| **High-pass** | fast wiggles only | removing a slow drifting bias |
-| **Band-pass** | wiggles in one middle range | isolating a voice from rumble and whistle |
-| **Notch** | everything *except* one exact speed | killing 60 Hz electrical hum |
+| **Low-pass** | Passes slow variation, attenuates fast variation | Removing hiss or high-frequency noise |
+| **High-pass** | Passes fast variation, attenuates slow variation | Removing drift or DC bias |
+| **Band-pass** | Passes a selected frequency range | Isolating a voice or instrument |
+| **Notch** | Removes one specific frequency, passes the rest | Eliminating 60 Hz electrical hum |
 
-Here's what each one actually does to a real signal, measured straight off
-this project's own filter code (not a simplified stand-in):
+The figure below shows each filter applied to a real signal. The waveforms
+are generated directly from the project's compiled filter code — the same
+code that runs on the microcontroller — not a simplified illustration:
 
 ![Four before-and-after examples: low-pass, high-pass, band-pass and notch filters applied to example waveforms](docs/img/filters_explained.png)
 
-### Is it any good?
+### Measured results
 
-![Six key metrics: 48,000 samples/second, 3,750 automated checks, ~1.3ms latency, 2.5%/19% memory used, 74-88dB output quality, 5 verified filter examples](docs/img/by_the_numbers.svg)
+![Six key metrics: 48,000 samples/second, 3,750 automated checks, ~1.3ms pipeline latency, 2.5%/19.5% memory used, 74.7-88.2dB output quality, 5 verified filter examples](docs/img/by_the_numbers.svg)
 
-In short: it runs fast enough for real audio, uses a tiny sliver of the
-chip's memory, and — unusually for a hobby-scale project — every single
-output sample is checked, automatically, against what a perfect mathematical
-filter should have produced. Nothing above is a marketing estimate; every
-number links to exactly where it comes from in this repository.
+Every figure above is measured from this repository, not estimated or
+approximated. The system meets its real-time budget with a wide margin,
+uses a small fraction of the microcontroller's available memory, and —
+unusually, even for production firmware — every output sample is
+automatically checked against a mathematically exact reference before the
+build is considered passing.
 
-**That's the whole pitch.** Everything from here down is the engineering
-detail behind it, for anyone who wants to see how it actually works.
+The remainder of this document is the full engineering write-up: system
+architecture, the mathematics behind every filter, and the verification
+strategy that backs the results above.
 
 ---
 
@@ -44,6 +48,11 @@ Design a digital filter in Python, quantise it for a microcontroller, upload
 it over a framed serial protocol, and run it in real time under FreeRTOS on
 an emulated STM32F405 (Cortex-M4F, QEMU `netduinoplus2`). Then prove
 that the board's output is **bit-identical** to a reference model.
+
+![System architecture: host pipeline, serial link, FreeRTOS board, and the verification loop that closes it](docs/img/system_diagram.svg)
+
+The same flow, with the internal task and interrupt structure the board
+actually runs:
 
 ```
 Python: design ─► quantise ─► upload ─► stream ─► verify (bit-exact) ─► report
@@ -55,12 +64,8 @@ STM32F405 / FreeRTOS:  link_rx ─► DSP task (FIR / biquad, Q15 · Q31 · f32)
                      sample-clock ISR (NCO + noise), zero-copy block pool
 ```
 
-![System architecture: host pipeline, FreeRTOS task graph, and the bit-exact verification loop](docs/img/system_diagram.svg)
-
-The diagram above is the detailed version of the ASCII sketch: the four-stage
-host pipeline, every FreeRTOS task/ISR and its priority, the ping-pong
-coefficient banks and lock-free block pool, the fault-handling path, and the
-three-way (Python / SIL / PIL) bit-exact verification loop that closes it.
+Every task, interrupt priority, memory region, and failure-handling path
+behind that sketch is documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## What's in it
 
