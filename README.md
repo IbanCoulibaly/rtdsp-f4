@@ -3,6 +3,43 @@
 [![CI](https://github.com/IbanCoulibaly/rtdsp-f4/actions/workflows/ci.yml/badge.svg)](https://github.com/IbanCoulibaly/rtdsp-f4/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+## What is this, in plain English?
+
+This project takes a wobbly signal — sound, really, but it could be any
+electrical signal that wiggles up and down — and cleans it up in real time,
+on a microcontroller the size of a fingernail that costs about $10.
+
+A **filter** is a set of rules about which "speeds of wiggle" (engineers call
+this *frequency*) get let through, and which get blocked. This project builds
+four classic kinds of rules:
+
+| Filter | What it lets through | Everyday example |
+|---|---|---|
+| **Low-pass** | slow wiggles only | smoothing out hiss or static |
+| **High-pass** | fast wiggles only | removing a slow drifting bias |
+| **Band-pass** | wiggles in one middle range | isolating a voice from rumble and whistle |
+| **Notch** | everything *except* one exact speed | killing 60 Hz electrical hum |
+
+Here's what each one actually does to a real signal, measured straight off
+this project's own filter code (not a simplified stand-in):
+
+![Four before-and-after examples: low-pass, high-pass, band-pass and notch filters applied to example waveforms](docs/img/filters_explained.png)
+
+### Is it any good?
+
+![Six key metrics: 48,000 samples/second, 3,750 automated checks, ~1.3ms latency, 2.5%/19% memory used, 74-88dB output quality, 5 verified filter examples](docs/img/by_the_numbers.svg)
+
+In short: it runs fast enough for real audio, uses a tiny sliver of the
+chip's memory, and — unusually for a hobby-scale project — every single
+output sample is checked, automatically, against what a perfect mathematical
+filter should have produced. Nothing above is a marketing estimate; every
+number links to exactly where it comes from in this repository.
+
+**That's the whole pitch.** Everything from here down is the engineering
+detail behind it, for anyone who wants to see how it actually works.
+
+---
+
 Design a digital filter in Python, quantise it for a microcontroller, upload
 it over a framed serial protocol, and run it in real time under FreeRTOS on
 an emulated STM32F405 (Cortex-M4F, QEMU `netduinoplus2`). Then prove
