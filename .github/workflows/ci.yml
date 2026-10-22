@@ -1,0 +1,46 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain and emulator
+        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi qemu-system-arm cppcheck
+
+      - name: FreeRTOS kernel (pinned)
+        run: git clone --depth 1 --branch V11.1.0 https://github.com/FreeRTOS/FreeRTOS-Kernel.git third_party/FreeRTOS-Kernel
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python deps
+        run: python -m venv .venv && .venv/bin/pip install -r requirements.txt
+
+      - name: Generated tables are up to date
+        run: make tables && git diff --exit-code firmware/app/generated
+
+      - name: Static analysis
+        run: make lint
+
+      - name: Firmware (QEMU and hardware targets)
+        run: make fw TARGET=qemu && make fw TARGET=hw
+
+      - name: Unit (ASan+UBSan), SIL and PIL tests
+        run: make test
+
+      - name: Demo report
+        run: make demo
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-and-report
+          path: |
+            build/fw/*/rtdsp.elf
+            build/fw/*/rtdsp.bin
+            build/fw/*/rtdsp.map
+            build/reports/

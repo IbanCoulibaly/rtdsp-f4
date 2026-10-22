@@ -1,0 +1,218 @@
+<svg width="1500" height="1080" viewBox="0 0 1500 1080" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="1500" height="1080" fill="#ffffff"/>
+
+  <text x="750" y="36" text-anchor="middle" font-size="26" font-weight="bold" fill="#111827">RTDSP-F4 — system architecture</text>
+  <text x="750" y="58" text-anchor="middle" font-size="14" fill="#6b7280">design (Python) → quantise → upload → run under FreeRTOS on an emulated STM32F405 → stream back → verify bit-exact</text>
+
+  <!-- ============ LANE A: HOST ============ -->
+  <rect x="30" y="78" width="1440" height="178" rx="10" fill="#eff6ff" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="50" y="103" font-size="18" font-weight="bold" fill="#1e3a8a">HOST — Python (python/rtdsp)</text>
+
+  <!-- box template: 300 wide, 4 boxes -->
+  <g>
+    <rect x="50" y="118" width="300" height="118" rx="8" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.5"/>
+    <text x="200" y="140" text-anchor="middle" font-size="15" font-weight="bold" fill="#1e3a8a">1. Design</text>
+    <text x="200" y="163" text-anchor="middle" font-size="11.5" fill="#374151">scipy.signal: Butterworth,</text>
+    <text x="200" y="179" text-anchor="middle" font-size="11.5" fill="#374151">Chebyshev-I, elliptic, RBJ</text>
+    <text x="200" y="195" text-anchor="middle" font-size="11.5" fill="#374151">notch, Kaiser-window FIR</text>
+    <text x="200" y="216" text-anchor="middle" font-size="11" fill="#6b7280">bilinear transform, pre-warped</text>
+  </g>
+
+  <g>
+    <rect x="400" y="118" width="300" height="118" rx="8" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.5"/>
+    <text x="550" y="140" text-anchor="middle" font-size="15" font-weight="bold" fill="#1e3a8a">2. Quantise</text>
+    <text x="550" y="163" text-anchor="middle" font-size="11.5" fill="#374151">Q15 (FIR) · Q31 DF1 (IIR,</text>
+    <text x="550" y="179" text-anchor="middle" font-size="11.5" fill="#374151">proven non-overflowing</text>
+    <text x="550" y="195" text-anchor="middle" font-size="11.5" fill="#374151">post-shift) · f32 (DF2T)</text>
+    <text x="550" y="216" text-anchor="middle" font-size="11" fill="#6b7280">L∞ inter-stage scaling</text>
+  </g>
+
+  <g>
+    <rect x="750" y="118" width="300" height="118" rx="8" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.5"/>
+    <text x="900" y="140" text-anchor="middle" font-size="15" font-weight="bold" fill="#1e3a8a">3. FilterDesc</text>
+    <text x="900" y="163" text-anchor="middle" font-size="11.5" fill="#374151">the exact wire descriptor:</text>
+    <text x="900" y="179" text-anchor="middle" font-size="11.5" fill="#374151">type · post_shift · order</text>
+    <text x="900" y="195" text-anchor="middle" font-size="11.5" fill="#374151">· coefficients</text>
+    <text x="900" y="216" text-anchor="middle" font-size="11" fill="#6b7280">mirrors protocol_defs.h exactly</text>
+  </g>
+
+  <g>
+    <rect x="1100" y="118" width="300" height="118" rx="8" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.5"/>
+    <text x="1250" y="140" text-anchor="middle" font-size="15" font-weight="bold" fill="#1e3a8a">4. Encode / verify</text>
+    <text x="1250" y="163" text-anchor="middle" font-size="11.5" fill="#374151">CRC-16/CCITT then COBS</text>
+    <text x="1250" y="179" text-anchor="middle" font-size="11.5" fill="#374151">framing for the wire</text>
+    <text x="1250" y="206" text-anchor="middle" font-size="11" fill="#6b7280">device replies compared, every</text>
+    <text x="1250" y="220" text-anchor="middle" font-size="11" fill="#6b7280">sample, against this model</text>
+  </g>
+
+  <!-- arrows between host boxes -->
+  <g stroke="#1d4ed8" stroke-width="2" fill="none" marker-end="url(#arrowBlue)">
+    <path d="M350,177 H398"/>
+    <path d="M700,177 H748"/>
+    <path d="M1050,177 H1098"/>
+  </g>
+
+  <!-- ============ WIRE ============ -->
+  <text x="750" y="272" text-anchor="middle" font-size="13.5" fill="#374151">USART1 @ 921 600 baud (QEMU: tcp:5555) — frame = COBS( type · seq · payload ≤ 600 B · CRC16-LE ) 0x00</text>
+  <rect x="50" y="280" width="1400" height="26" fill="#e5e7eb" stroke="#374151" stroke-width="1.5"/>
+  <text x="70" y="298" font-size="11.5" fill="#1f2937">host → device:  PING · SET_FILTER · PROCESS · GET_STATS · RESET_STATE · SET_MODE · DEBUG_FAULT →</text>
+  <text x="1430" y="298" text-anchor="end" font-size="11.5" fill="#1f2937">← PONG/BOOT · ACK · PROCESS_RESULT · STATS · STREAM</text>
+
+  <g stroke="#374151" stroke-width="2.5" fill="none" marker-end="url(#arrowGray)">
+    <path d="M750,306 V345"/>
+  </g>
+  <g stroke="#374151" stroke-width="2.5" fill="none" marker-end="url(#arrowGrayUp)">
+    <path d="M1430,345 V280"/>
+  </g>
+
+  <!-- ============ LANE B: MCU ============ -->
+  <rect x="30" y="352" width="1440" height="508" rx="10" fill="#ecfdf5" stroke="#047857" stroke-width="2"/>
+  <text x="50" y="377" font-size="18" font-weight="bold" fill="#065f46">STM32F405 — FreeRTOS V11.1, static allocation only (running under QEMU netduinoplus2)</text>
+  <rect x="1215" y="362" width="235" height="26" rx="5" fill="#fef9c3" stroke="#b45309" stroke-width="1.5"/>
+  <text x="1332" y="379" text-anchor="middle" font-size="10.5" fill="#78350f">POST @ boot: golden CRC vs Python model</text>
+
+  <!-- ISR column 1 -->
+  <rect x="55" y="400" width="185" height="54" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+  <text x="147" y="421" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#78350f">USART1 RX ISR</text>
+  <text x="147" y="437" text-anchor="middle" font-size="10" fill="#92400e">bytes → rx stream buffer</text>
+
+  <rect x="55" y="470" width="185" height="70" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+  <text x="147" y="491" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#78350f">sample-clock ISR</text>
+  <text x="147" y="507" text-anchor="middle" font-size="10" fill="#92400e">NCO (§7.1) + xorshift32</text>
+  <text x="147" y="521" text-anchor="middle" font-size="10" fill="#92400e">noise (§7.3), 48 000/s</text>
+
+  <!-- intake tasks column 2 -->
+  <rect x="275" y="400" width="200" height="54" rx="7" fill="#ffffff" stroke="#047857" stroke-width="1.5"/>
+  <text x="375" y="419" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#065f46">link_rx task · prio 5</text>
+  <text x="375" y="435" text-anchor="middle" font-size="9.5" fill="#374151">COBS⁻¹ · CRC · stability triangle</text>
+  <text x="375" y="448" text-anchor="middle" font-size="9.5" fill="#374151">builds the inactive engine bank</text>
+
+  <rect x="275" y="470" width="200" height="70" rx="7" fill="#ffffff" stroke="#047857" stroke-width="1.5"/>
+  <text x="375" y="492" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#065f46">block pool</text>
+  <text x="375" y="508" text-anchor="middle" font-size="10" fill="#374151">8 blocks of 32 samples,</text>
+  <text x="375" y="522" text-anchor="middle" font-size="10" fill="#374151">circulate ISR→DSP→TX→pool</text>
+
+  <!-- ping-pong banks column 3 -->
+  <rect x="505" y="400" width="110" height="140" rx="7" fill="#d1fae5" stroke="#047857" stroke-width="1.5"/>
+  <text x="560" y="425" text-anchor="middle" font-size="11.5" font-weight="bold" fill="#065f46">engines[0]</text>
+  <text x="560" y="442" text-anchor="middle" font-size="11.5" font-weight="bold" fill="#065f46">engines[1]</text>
+  <text x="560" y="462" text-anchor="middle" font-size="10" fill="#065f46">ping-pong,</text>
+  <text x="560" y="476" text-anchor="middle" font-size="10" fill="#065f46">CCM RAM</text>
+  <text x="560" y="520" text-anchor="middle" font-size="9.5" fill="#6b7280">SWAP applied</text>
+  <text x="560" y="533" text-anchor="middle" font-size="9.5" fill="#6b7280">between blocks</text>
+
+  <!-- DSP queue + task column 4 -->
+  <rect x="645" y="400" width="34" height="140" rx="6" fill="#f3f4f6" stroke="#374151" stroke-width="1.2"/>
+  <text x="662" y="470" text-anchor="middle" font-size="10" fill="#374151" transform="rotate(-90 662 470)">DSP queue</text>
+
+  <rect x="705" y="400" width="230" height="140" rx="7" fill="#ffffff" stroke="#047857" stroke-width="2"/>
+  <text x="820" y="424" text-anchor="middle" font-size="14" font-weight="bold" fill="#065f46">dsp task · prio 6</text>
+  <text x="820" y="440" text-anchor="middle" font-size="10.5" fill="#374151">(highest — real-time path)</text>
+  <text x="820" y="462" text-anchor="middle" font-size="10.5" fill="#374151">FIR Q15/f32 or</text>
+  <text x="820" y="477" text-anchor="middle" font-size="10.5" fill="#374151">biquad Q31/f32 cascade,</text>
+  <text x="820" y="492" text-anchor="middle" font-size="10.5" fill="#374151">stage-major, per block</text>
+  <text x="820" y="514" text-anchor="middle" font-size="9.5" fill="#6b7280">never blocks on TX —</text>
+  <text x="820" y="527" text-anchor="middle" font-size="9.5" fill="#6b7280">full queue drops &amp; counts</text>
+
+  <rect x="965" y="400" width="34" height="140" rx="6" fill="#f3f4f6" stroke="#374151" stroke-width="1.2"/>
+  <text x="982" y="470" text-anchor="middle" font-size="10" fill="#374151" transform="rotate(-90 982 470)">TX queue</text>
+
+  <!-- link_tx + TX ISR column 5 -->
+  <rect x="1025" y="400" width="200" height="54" rx="7" fill="#ffffff" stroke="#047857" stroke-width="1.5"/>
+  <text x="1125" y="419" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#065f46">link_tx task · prio 4</text>
+  <text x="1125" y="435" text-anchor="middle" font-size="9.5" fill="#374151">sole writer of USART1 TX:</text>
+  <text x="1125" y="448" text-anchor="middle" font-size="9.5" fill="#374151">frame, CRC-16, COBS</text>
+
+  <rect x="1255" y="400" width="175" height="54" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+  <text x="1342" y="421" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#78350f">USART1 TX ISR</text>
+  <text x="1342" y="437" text-anchor="middle" font-size="10" fill="#92400e">→ out to host (wire above)</text>
+
+  <!-- flow arrows for the main pipeline -->
+  <defs>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#1d4ed8"/></marker>
+    <marker id="arrowGray" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#374151"/></marker>
+    <marker id="arrowGrayUp" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#374151"/></marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#047857"/></marker>
+    <marker id="arrowAmber" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#b45309"/></marker>
+    <marker id="arrowPurple" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#6d28d9"/></marker>
+  </defs>
+
+  <g stroke="#b45309" stroke-width="2" fill="none" marker-end="url(#arrowAmber)">
+    <path d="M147,454 V470"/>
+    <path d="M240,427 H273"/>
+  </g>
+  <g stroke="#047857" stroke-width="2" fill="none" marker-end="url(#arrowGreen)">
+    <path d="M475,427 H503"/>
+    <path d="M475,505 H645"/>
+    <path d="M615,470 H645"/>
+    <path d="M679,470 H705"/>
+    <path d="M935,470 H965"/>
+    <path d="M999,470 H1023"/>
+  </g>
+  <g stroke="#b45309" stroke-width="2" fill="none" marker-end="url(#arrowAmber)">
+    <path d="M1225,427 H1253"/>
+  </g>
+  <text x="400" y="555" text-anchor="middle" font-size="9.5" fill="#6b7280">block returned to pool after TX (or after a drop)</text>
+  <path d="M375,540 Q375,565 300,565 Q238,565 238,541" stroke="#9ca3af" stroke-width="1.3" fill="none" stroke-dasharray="3,3" marker-end="url(#arrowGray)"/>
+
+  <!-- supervisor row -->
+  <rect x="55" y="585" width="1350" height="40" rx="7" fill="#f3f4f6" stroke="#374151" stroke-width="1.3"/>
+  <text x="75" y="609" font-size="12" fill="#1f2937"><tspan font-weight="bold">supervisor task · prio 2</tspan> — per-task heartbeats, CPU load, stack-margin checks, kicks the IWDG every 500 ms only if every task is healthy</text>
+  <g stroke="#9ca3af" stroke-width="1.2" fill="none" stroke-dasharray="2,3" marker-end="url(#arrowGray)">
+    <path d="M375,585 V546"/>
+    <path d="M820,585 V546"/>
+    <path d="M1125,585 V460"/>
+  </g>
+
+  <!-- log row -->
+  <rect x="55" y="635" width="1350" height="36" rx="7" fill="#f3f4f6" stroke="#374151" stroke-width="1.3"/>
+  <text x="75" y="657" font-size="12" fill="#1f2937"><tspan font-weight="bold">log task · prio 1</tspan> — sole writer of the USART2 console (boot report, stats, crash summaries)</text>
+
+  <!-- fault row -->
+  <rect x="55" y="693" width="660" height="80" rx="7" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5"/>
+  <text x="75" y="715" font-size="12.5" font-weight="bold" fill="#7f1d1d">Fault handling</text>
+  <text x="75" y="733" font-size="10.5" fill="#7f1d1d">HardFault/MemManage/Bus/UsageFault (picks MSP/PSP, reads CFSR+BFAR/MMFAR),</text>
+  <text x="75" y="748" font-size="10.5" fill="#7f1d1d">configASSERT, stack-overflow hook, unexpected-IRQ handler, task-hang detection</text>
+  <text x="75" y="763" font-size="10.5" fill="#7f1d1d">→ all funnel into one crash recorder</text>
+
+  <g stroke="#b91c1c" stroke-width="2" fill="none" marker-end="url(#arrowAmber)">
+    <path d="M715,733 H765"/>
+  </g>
+  <rect x="770" y="693" width="635" height="80" rx="7" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5"/>
+  <text x="790" y="715" font-size="12.5" font-weight="bold" fill="#7f1d1d">Crash record (.noinit, CRC-checked)</text>
+  <text x="790" y="733" font-size="10.5" fill="#7f1d1d">survives SYSRESETREQ (Reset_Handler does not clear .noinit) →</text>
+  <text x="790" y="748" font-size="10.5" fill="#7f1d1d">next BOOT frame + console report the reason, PC, LR, CFSR →</text>
+  <text x="790" y="763" font-size="10.5" fill="#7f1d1d">hardware IWDG is the final backstop if software never gets this far</text>
+
+  <!-- ============ LANE C: VERIFICATION ============ -->
+  <rect x="30" y="882" width="1440" height="178" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"/>
+  <text x="50" y="907" font-size="18" font-weight="bold" fill="#4c1d95">VERIFICATION — three independent witnesses, checked bit-exact</text>
+
+  <rect x="90" y="922" width="400" height="80" rx="8" fill="#ffffff" stroke="#6d28d9" stroke-width="1.5"/>
+  <text x="290" y="946" text-anchor="middle" font-size="13" font-weight="bold" fill="#4c1d95">Python reference model</text>
+  <text x="290" y="964" text-anchor="middle" font-size="10.5" fill="#374151">float64 design (scipy) +</text>
+  <text x="290" y="979" text-anchor="middle" font-size="10.5" fill="#374151">bit-exact Q15/Q31/f32 model</text>
+
+  <rect x="550" y="922" width="400" height="80" rx="8" fill="#ffffff" stroke="#6d28d9" stroke-width="1.5"/>
+  <text x="750" y="946" text-anchor="middle" font-size="13" font-weight="bold" fill="#4c1d95">SIL — software-in-the-loop</text>
+  <text x="750" y="964" text-anchor="middle" font-size="10.5" fill="#374151">libs/dsp + libs/link, the real</text>
+  <text x="750" y="979" text-anchor="middle" font-size="10.5" fill="#374151">C source, compiled for the host</text>
+
+  <rect x="1010" y="922" width="400" height="80" rx="8" fill="#ffffff" stroke="#6d28d9" stroke-width="1.5"/>
+  <text x="1210" y="946" text-anchor="middle" font-size="13" font-weight="bold" fill="#4c1d95">PIL — processor-in-the-loop</text>
+  <text x="1210" y="964" text-anchor="middle" font-size="10.5" fill="#374151">the same ELF, cross-compiled,</text>
+  <text x="1210" y="979" text-anchor="middle" font-size="10.5" fill="#374151">booted on QEMU's STM32F405</text>
+
+  <g stroke="#6d28d9" stroke-width="2" fill="none" marker-end="url(#arrowPurple)" marker-start="url(#arrowPurple)">
+    <path d="M490,962 H548"/>
+    <path d="M950,962 H1008"/>
+  </g>
+  <text x="519" y="952" text-anchor="middle" font-size="9.5" fill="#4c1d95">bit-exact</text>
+  <text x="979" y="952" text-anchor="middle" font-size="9.5" fill="#4c1d95">bit-exact</text>
+
+  <text x="290" y="1017" text-anchor="middle" font-size="11" fill="#4c1d95">3 686 C unit checks (ASan+UBSan)</text>
+  <text x="750" y="1017" text-anchor="middle" font-size="11" fill="#4c1d95">47 SIL tests, 5 filter kernels</text>
+  <text x="1210" y="1017" text-anchor="middle" font-size="11" fill="#4c1d95">17 PIL tests incl. deliberate crashes</text>
+  <text x="750" y="1042" text-anchor="middle" font-size="11" fill="#6b7280">all of it runs in CI on every push — unit + SIL + PIL + lint</text>
+
+</svg>
