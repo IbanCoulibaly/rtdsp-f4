@@ -8,11 +8,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Toolchain and emulator
-        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi qemu-system-arm cppcheck
+      - name: Toolchain (compiler, static analysis, QEMU build deps)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi cppcheck \
+            ninja-build meson pkg-config libglib2.0-dev libpixman-1-dev \
+            python3-venv flex bison
 
       - name: FreeRTOS kernel (pinned)
         run: git clone --depth 1 --branch V11.1.0 https://github.com/FreeRTOS/FreeRTOS-Kernel.git third_party/FreeRTOS-Kernel
+
+      # Ubuntu 24.04's apt package is QEMU 8.2.2. This project is built and
+      # verified against QEMU 11.1.x specifically -- docs/ARCHITECTURE.md §7
+      # documents a QEMU-11.1-specific STM32 timer-model bug and the SysTick
+      # workaround the firmware relies on. On 8.2.2 the PIL tests time out
+      # waiting for the board's first response, which is what led to pinning
+      # this (same reasoning as pinning FreeRTOS-Kernel above: reproducibility
+      # over whatever the OS archive happens to carry).
+      - name: Cache QEMU 11.1.2 (arm-softmmu)
+        id: qemu-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/qemu-install
+          key: qemu-11.1.2-arm-softmmu-${{ runner.os }}-v1
+
+      - name: Build QEMU 11.1.2 (arm-softmmu only, if not cached)
+        if: steps.qemu-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch v11.1.2 https://gitlab.com/qemu-project/qemu.git /tmp/qemu-src
+          cd /tmp/qemu-src
+          ./configure --target-list=arm-softmmu --prefix="$HOME/qemu-install" --disable-docs --disable-gtk --disable-sdl
+          make -j"$(nproc)"
+          make install
+
+      - name: Add QEMU to PATH
+        run: echo "$HOME/qemu-install/bin" >> "$GITHUB_PATH"
 
       - uses: actions/setup-python@v5
         with:
