@@ -7,6 +7,7 @@
 #   make test      unit + full pytest suite (SIL + emulator PIL)
 #   make run       boot the firmware in QEMU (console on stdio, data link on tcp:5555)
 #   make demo      end-to-end demo: design -> upload -> stream -> plots in build/reports
+#   make gallery   per-filter input/output plots + docs/GALLERY.md (committed to the repo)
 #   make viz       interactive viewer: input/output window + equation window per filter
 #   make play      adjustable filter playground: sine + noise, live LP/HP/gain on the board
 #   make lint      cppcheck static analysis (if installed)
@@ -41,7 +42,7 @@ LIB_SRCS := $(wildcard libs/dsp/src/*.c) $(wildcard libs/link/src/*.c)
 SIL_LIB  := $(HOSTDIR)/librtdsp_sil.$(SHLIB_EXT)
 UNIT_BIN := $(HOSTDIR)/unit_tests
 
-.PHONY: all unit sil tables fw test test-sil test-pil run demo viz play lint clean
+.PHONY: all unit sil tables fw test test-sil test-pil run demo gallery viz play lint clean
 
 all: unit sil fw
 
@@ -81,6 +82,9 @@ run: fw
 
 demo: sil fw
 	$(PY) python/tools/demo.py
+
+gallery: fw
+	$(PY) python/tools/gallery.py
 
 viz: fw
 	$(PY) python/tools/visualize.py
